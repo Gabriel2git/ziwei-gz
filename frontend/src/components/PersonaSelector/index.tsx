@@ -28,8 +28,8 @@ export default function PersonaSelector({ selectedPersona, onPersonaChange }: Pe
         </p>
       </div>
 
-      {/* 三个卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-6 mb-4">
+      {/* 三个卡片 - 竖向排列，宽度一致 */}
+      <div className="flex flex-col items-center gap-2 sm:gap-6 mb-4 w-full max-w-[180px] mx-auto">
         {PERSONA_CONFIGS.map((config) => {
           const isSelected = tempSelection === config.id;
           
@@ -38,7 +38,7 @@ export default function PersonaSelector({ selectedPersona, onPersonaChange }: Pe
               key={config.id}
               onClick={() => setTempSelection(config.id)}
               className={`
-                relative p-2 sm:p-6 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 cursor-pointer
+                relative w-full p-2 sm:p-6 rounded-xl sm:rounded-2xl border-2 transition-all duration-300 cursor-pointer
                 hover:shadow-lg hover:scale-105 bg-white dark:bg-gray-800
                 ${isSelected 
                   ? 'border-purple-500 shadow-xl scale-105 ring-1 ring-purple-500' 
