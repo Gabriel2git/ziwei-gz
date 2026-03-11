@@ -131,7 +131,7 @@ export default function ChartView({
                             setSelectedYear(null);
                           }
                         }}
-                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                        className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                           selectedDecadal?.start === palace.decadal?.range?.[0] 
                             ? 'bg-blue-500 text-white' 
                             : 'bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
@@ -158,7 +158,7 @@ export default function ChartView({
                               setSelectedYear(year);
                             }
                           }}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                             selectedYear === year 
                               ? 'bg-red-500 text-white' 
                               : 'bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'

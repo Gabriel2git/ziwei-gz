@@ -49,9 +49,13 @@ export default function PalaceCell({ palace, horoscope, earthlyBranchOfBodyPalac
   const yearlyPalace = getDynamicPalaceName(palace.earthlyBranch, horoscope?.yearly?.earthlyBranch);
 
   return (
-    <div className={`w-full h-full p-0.5 sm:p-1.5 flex flex-col justify-between border border-gray-600 dark:border-gray-500 bg-white dark:bg-[#1a2a2a]
-      ${isCurrentDecadal ? 'border-2 border-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] bg-blue-50 dark:bg-blue-900/30' : ''}
-      ${isCurrentYearly ? 'border-2 border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] bg-red-50 dark:bg-red-900/30' : ''}
+    <div className={`w-full h-full p-0.5 sm:p-1.5 flex flex-col justify-between
+      ${isCurrentYearly
+        ? 'border-2 border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)] bg-red-50 dark:bg-red-900/30'
+        : isCurrentDecadal
+          ? 'border-2 border-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] bg-blue-50 dark:bg-blue-900/30'
+          : 'border border-gray-600 dark:border-gray-500 bg-white dark:bg-[#1a2a2a]'
+      }
     `}>
       
       {/* 顶部：星曜区 (权重最高) */}
