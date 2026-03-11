@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { getLunarBaseYear } from '@/lib/shichen';
 import { AI_MODELS } from '@/lib/ai';
 import { useZiweiData } from '@/hooks/useZiweiData';
@@ -35,6 +35,56 @@ export default function Home() {
   const [currentPage, setCurrentPage] = useState<PageType>('命盘显示');
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
   const [darkMode, setDarkMode] = useState(false);
+  
+  // 侧边栏宽度状态
+  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [isDragging, setIsDragging] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(0);
+
+  // 处理拖动开始
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    setIsDragging(true);
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = sidebarWidth;
+    e.preventDefault();
+  }, [sidebarWidth]);
+
+  // 处理拖动中
+  const handleDragMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return;
+    const delta = e.clientX - dragStartX.current;
+    const newWidth = Math.max(200, Math.min(400, dragStartWidth.current + delta));
+    setSidebarWidth(newWidth);
+  }, [isDragging]);
+
+  // 处理拖动结束
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // 添加/移除全局事件监听
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDragMove);
+      document.addEventListener('mouseup', handleDragEnd);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    
+    return () => {
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging, handleDragMove, handleDragEnd]);
 
   const [hasBirthData, setHasBirthData] = useState(false);
   const [birthData, setBirthData] = useState<BirthData | null>(null);
@@ -171,15 +221,32 @@ export default function Home() {
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-purple-50 to-blue-50 dark:from-[#0f1a1a] dark:to-[#0a1414]">
       <div className="flex h-full">
-        <Sidebar
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          selectedModel={selectedModel}
-          setSelectedModel={setSelectedModel}
-          darkMode={darkMode}
-          toggleDarkMode={toggleDarkMode}
-          onDataLoaded={handleDataLoaded}
-        />
+        {/* 侧边栏容器 */}
+        <div 
+          ref={sidebarRef}
+          className="relative flex-shrink-0"
+          style={{ width: sidebarWidth }}
+        >
+          <Sidebar
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            selectedModel={selectedModel}
+            setSelectedModel={setSelectedModel}
+            darkMode={darkMode}
+            toggleDarkMode={toggleDarkMode}
+            onDataLoaded={handleDataLoaded}
+          />
+          
+          {/* 拖动条 */}
+          <div
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-purple-500/30 transition-colors z-50"
+            onMouseDown={handleDragStart}
+            style={{ cursor: isDragging ? 'col-resize' : 'ew-resize' }}
+          >
+            {/* 拖动指示器 */}
+            <div className="absolute top-1/2 right-0 transform -translate-y-1/2 w-1 h-12 bg-gray-400 dark:bg-gray-600 rounded-full opacity-50 hover:opacity-100 transition-opacity" />
+          </div>
+        </div>
 
         <main className="flex-1 p-6 overflow-hidden">
           {/* 错误信息显示 */}
@@ -228,6 +295,10 @@ export default function Home() {
                 onSaveHistory={() => saveChatHistory(birthData?.birthday || '', birthData?.gender || '')}
                 onLoadHistory={loadChatHistory}
                 setMessages={setMessages}
+                selectedPersona={selectedPersona}
+                onPersonaChange={setSelectedPersona}
+                ziweiData={ziweiData}
+                initializeChat={initializeChat}
               />
             </div>
           ) : (

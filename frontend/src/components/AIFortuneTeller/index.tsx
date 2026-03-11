@@ -25,6 +25,10 @@ interface AIFortuneTellerProps {
   onSaveHistory: () => void;
   onLoadHistory: (event: React.ChangeEvent<HTMLInputElement>) => void;
   setMessages: (msgs: any[]) => void;
+  selectedPersona: PersonaType;
+  onPersonaChange: (persona: PersonaType) => void;
+  ziweiData: any;
+  initializeChat: (ziweiData: any, persona?: PersonaType) => void;
 }
 
 // 内部组件，在 AuthProvider 内使用
@@ -46,9 +50,12 @@ function AIFortuneTellerContent({
   onSaveHistory,
   onLoadHistory,
   setMessages,
+  selectedPersona,
+  onPersonaChange,
+  ziweiData,
+  initializeChat,
 }: AIFortuneTellerProps) {
   const { isAuthenticated } = useAuth();
-  const [selectedPersona, setSelectedPersona] = useState<PersonaType>('companion');
   const [currentView, setCurrentView] = useState<'select-persona' | 'chat'>('select-persona');
 
   // 如果未验证，显示 AuthGuard
@@ -63,7 +70,16 @@ function AIFortuneTellerContent({
         <PersonaSelector
           selectedPersona={selectedPersona}
           onPersonaChange={(persona) => {
-            setSelectedPersona(persona);
+            // 检查是否已排盘
+            if (!hasBirthData) {
+              alert('请先输入出生信息并排盘，然后再选择命理师');
+              return;
+            }
+            onPersonaChange(persona);
+            // 如果已有命盘数据，使用新的 persona 重新初始化聊天
+            if (ziweiData) {
+              initializeChat(ziweiData, persona);
+            }
             setCurrentView('chat');
           }}
         />

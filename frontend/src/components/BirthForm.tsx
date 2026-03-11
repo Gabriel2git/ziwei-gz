@@ -154,7 +154,7 @@ export default function BirthForm({ onDataLoaded }: BirthFormProps) {
           <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className={`flex-1 min-w-[80px] p-2 border-2 ${errors.date ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} rounded-lg focus:border-purple-500 focus:outline-none transition-all text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 text-sm`}
+            className={`flex-1 min-w-[90px] p-2 border-2 ${errors.date ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} rounded-lg focus:border-purple-500 focus:outline-none transition-all text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 text-sm`}
           >
             {years.map((y) => (
               <option key={y} value={y} className="text-gray-900 dark:text-gray-100">{y}年</option>

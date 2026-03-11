@@ -32,30 +32,34 @@ export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
     scrollToBottom();
   }, [messages]);
 
-  const initializeChat = (ziweiData: ZiweiData) => {
+  const initializeChat = (ziweiData: ZiweiData, persona?: PersonaType) => {
+    // 使用传入的 persona 或当前状态的 selectedPersona
+    const currentPersona = persona || selectedPersona;
+    // 使用 generateMasterPrompt 生成包含 Persona 的完整 prompt
+    const fullPrompt = generateMasterPrompt('请分析我的命盘', ziweiData, horoscopeYear, currentPersona);
     const [sysPrompt, dataContext] = parseZiweiToPrompt(ziweiData);
     setMessages([
-      { role: 'system', content: sysPrompt },
-      { role: 'system', content: dataContext },
+      { role: 'system', content: fullPrompt },
       { 
         role: 'assistant', 
         content: '你好！我已经完整解析了这张命盘的本命结构。\n你可以问我：\n1. **格局性格**：例如「我适合创业还是上班？」\n2. **情感婚姻**：例如「我的正缘有什么特征？」\n3. **流年运势**：例如「今年要注意什么？」' 
       }
     ]);
-    setDebugPrompt(`=== 系统提示词 ===\n${sysPrompt}\n\n=== 数据上下文 ===\n${dataContext}`);
+    setDebugPrompt(`=== 系统提示词 ===\n${fullPrompt}`);
   };
 
   const updateChatForHoroscope = (ziweiData: ZiweiData) => {
+    // 使用 generateMasterPrompt 生成包含 Persona 的完整 prompt
+    const fullPrompt = generateMasterPrompt('请分析我的命盘', ziweiData, horoscopeYear, selectedPersona);
     const [sysPrompt, dataContext] = parseZiweiToPrompt(ziweiData);
     setMessages([
-      { role: 'system', content: sysPrompt },
-      { role: 'system', content: dataContext },
+      { role: 'system', content: fullPrompt },
       { 
         role: 'assistant', 
         content: '你好！我已经根据你选择的大限更新了命盘分析。\n你可以问我：\n1. **格局性格**：例如「我适合创业还是上班？」\n2. **情感婚姻**：例如「我的正缘有什么特征？」\n3. **流年运势**：例如「今年要注意什么？」' 
       }
     ]);
-    setDebugPrompt(`=== 系统提示词 ===\n${sysPrompt}\n\n=== 数据上下文 ===\n${dataContext}`);
+    setDebugPrompt(`=== 系统提示词 ===\n${fullPrompt}`);
   };
 
   const sendMessage = async (model: string) => {

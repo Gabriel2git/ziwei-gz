@@ -24,7 +24,7 @@ export default function Sidebar({
   onDataLoaded
 }: SidebarProps) {
   return (
-    <aside className="w-84 bg-white dark:bg-[#1a2a2a] shadow-xl p-6 flex flex-col h-full">
+    <aside className="w-full bg-white dark:bg-[#1a2a2a] shadow-xl p-4 lg:p-5 flex flex-col h-full overflow-y-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-purple-700 dark:text-purple-400">
           🟣 AI 紫微斗数 Pro
