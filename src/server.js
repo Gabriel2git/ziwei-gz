@@ -2,8 +2,10 @@ const http = require('http');
 const iztro = require('iztro');
 const RetrievalService = require('../backend/services/retrievalService');
 
-// 加载环境变量
-require('dotenv').config({ path: require('path').join(__dirname, '../backend/.env') });
+// 加载环境变量（本地开发时从 .env 文件加载，生产环境使用平台提供的环境变量）
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config({ path: require('path').join(__dirname, '../backend/.env') });
+}
 
 const port = 3001;
 
