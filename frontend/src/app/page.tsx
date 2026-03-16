@@ -334,6 +334,9 @@ export default function Home() {
               onSaveCase={handleSaveCurrentCase}
               onLoadCase={handleLoadSavedCase}
               onDeleteCase={handleDeleteSavedCase}
+              onYearChange={(year) => {
+                handleHoroscopeDateChange(new Date(year, 0, 1));
+              }}
               onTestAIPrompt={handleTestAIPrompt}
             />
           ) : currentPage === 'AI 命理师' ? (

@@ -1,44 +1,25 @@
 const http = require('http');
+const path = require('path');
 const iztro = require('iztro');
 const RetrievalService = require('../backend/services/retrievalService');
 
-// 加载环境变量（本地开发时从 .env 文件加载，生产环境使用平台提供的环境变量）
 if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config({ path: require('path').join(__dirname, '../backend/.env') });
+  require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
 }
 
 const port = 3001;
 
-// 调试日志：输出环境变量
-console.log('=== 服务器启动 ===');
+console.log('=== Server Start ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('AUTH_CODE 是否存在:', !!process.env.AUTH_CODE);
-console.log('AUTH_CODE 值:', process.env.AUTH_CODE);
+console.log('AUTH_CODE exists:', !!process.env.AUTH_CODE);
 
-// 初始化检索服务
 const retrievalService = new RetrievalService();
 retrievalService.initialize().catch(console.error);
 
-// 鉴权中间件 - Bearer Token 标准格式
-function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization;
-  // 提取 Bearer 后面的实际 token
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token || token !== process.env.AUTH_CODE) {
-    res.statusCode = 401;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: '功德码无效或已过期' }));
-    return;
-  }
-  next();
-}
-
-// 解析 JSON 请求体的函数
 function parseRequestBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => {
+    req.on('data', (chunk) => {
       body += chunk.toString();
     });
     req.on('end', () => {
@@ -52,21 +33,70 @@ function parseRequestBody(req) {
   });
 }
 
-// 创建 HTTP 服务器
+function getLifePalaceGanzhiFromHoroscope(astrolabe, horoscope) {
+  const yearlyPalaceNames = horoscope?.yearly?.palaceNames;
+  if (!Array.isArray(yearlyPalaceNames)) return '';
+  const lifePalaceIndex = yearlyPalaceNames.indexOf('命宫');
+  if (lifePalaceIndex < 0) return '';
+  const palace = astrolabe?.palaces?.[lifePalaceIndex];
+  if (!palace) return '';
+  return `${palace.heavenlyStem || ''}${palace.earthlyBranch || ''}`;
+}
+
+function getCurrentDecadalRange(astrolabe, horoscope) {
+  const decadalBranch = horoscope?.decadal?.earthlyBranch;
+  const decadalPalace = astrolabe?.palaces?.find((p) => p.earthlyBranch === decadalBranch);
+  return decadalPalace?.decadal?.range;
+}
+
+function buildDecadalYearlyInfo(astrolabe, targetYear, horoscope) {
+  const nominalAge = horoscope?.age?.nominalAge;
+  const range = getCurrentDecadalRange(astrolabe, horoscope);
+  if (!Array.isArray(range) || range.length !== 2 || typeof nominalAge !== 'number') {
+    return null;
+  }
+
+  const [startAge, endAge] = range;
+  const startYear = targetYear - (nominalAge - startAge);
+  const endYear = startYear + (endAge - startAge);
+  const years = [];
+
+  for (let year = startYear; year <= endYear; year += 1) {
+    const yearlyHoroscope = astrolabe.horoscope(`${year}-01-01`);
+    years.push({
+      year,
+      yearGanzhi: `${yearlyHoroscope?.yearly?.heavenlyStem || ''}${yearlyHoroscope?.yearly?.earthlyBranch || ''}`,
+      nominalAge: yearlyHoroscope?.age?.nominalAge ?? null,
+      lifePalaceGanzhi: getLifePalaceGanzhiFromHoroscope(astrolabe, yearlyHoroscope),
+      yearlyMutagen: yearlyHoroscope?.yearly?.mutagen || [],
+      decadalMutagen: yearlyHoroscope?.decadal?.mutagen || [],
+      decadalEarthlyBranch: yearlyHoroscope?.decadal?.earthlyBranch || '',
+      yearlyEarthlyBranch: yearlyHoroscope?.yearly?.earthlyBranch || '',
+      overlap:
+        yearlyHoroscope?.decadal?.earthlyBranch === yearlyHoroscope?.yearly?.earthlyBranch
+          ? '同宫'
+          : '无',
+    });
+  }
+
+  return {
+    range: [startYear, endYear],
+    ageRange: [startAge, endAge],
+    years,
+  };
+}
+
 const server = http.createServer(async (req, res) => {
-  // 设置 CORS 头
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // 处理 OPTIONS 请求
   if (req.method === 'OPTIONS') {
     res.statusCode = 204;
     res.end();
     return;
   }
 
-  // 健康检查接口
   if (req.method === 'GET' && req.url === '/health') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
@@ -74,12 +104,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 排盘 API 接口
   if (req.method === 'POST' && req.url === '/api/ziwei') {
     try {
       const body = await parseRequestBody(req);
       const { birthday, hourIndex, gender, isLunar, isLeap, targetYear } = body;
-      
+
       if (!birthday || hourIndex === undefined || !gender) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json');
@@ -87,28 +116,36 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      // 构建排盘函数调用 - 使用 iztro 标准 API
+      const normalizedTargetYear = targetYear === undefined ? new Date().getFullYear() : Number(targetYear);
+      if (!Number.isInteger(normalizedTargetYear) || normalizedTargetYear < 1900 || normalizedTargetYear > 2100) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'targetYear must be an integer between 1900 and 2100' }));
+        return;
+      }
+
       let astrolabe;
       if (isLunar) {
         astrolabe = iztro.astro.byLunar(birthday, hourIndex, gender, isLeap, true, 'zh-CN');
       } else {
         astrolabe = iztro.astro.bySolar(birthday, hourIndex, gender, true, 'zh-CN');
       }
-      
-      // 计算运势（包含大限和流年信息）
-      const horoscope = iztro.astro.getHoroscope(astrolabe, targetYear || new Date().getFullYear());
-      
-      // 返回结果
+
+      const horoscope = astrolabe.horoscope(`${normalizedTargetYear}-01-01`);
+      const decadalYearlyInfo = buildDecadalYearlyInfo(astrolabe, normalizedTargetYear, horoscope);
+
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
-        astrolabe: astrolabe,
-        horoscope: horoscope,
-        targetYear: targetYear
-      }));
-
+      res.end(
+        JSON.stringify({
+          astrolabe,
+          horoscope,
+          targetYear: normalizedTargetYear,
+          decadalYearlyInfo,
+        }),
+      );
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Ziwei API error:', error);
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({ error: error.message }));
@@ -116,12 +153,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // RAG 检索 API 接口
   if (req.method === 'POST' && req.url === '/api/rag/search') {
     try {
       const body = await parseRequestBody(req);
       const { query, topK = 3 } = body;
-      
+
       if (!query) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json');
@@ -129,20 +165,12 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      // 执行检索
       const results = await retrievalService.search(query, topK);
-      
-      // 构建上下文
       const context = retrievalService.buildContext(results);
 
-      // 返回结果
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
-        results: results,
-        context: context
-      }));
-
+      res.end(JSON.stringify({ results, context }));
     } catch (error) {
       console.error('RAG search error:', error);
       res.statusCode = 500;
@@ -152,12 +180,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // RAG 测试 API 接口
   if (req.method === 'POST' && req.url === '/api/rag/test') {
     try {
       const body = await parseRequestBody(req);
       const { query, topK = 3 } = body;
-      
+
       if (!query) {
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json');
@@ -165,24 +192,13 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      // 执行检索
       const results = await retrievalService.search(query, topK);
-      
-      // 构建上下文
       const context = retrievalService.buildContext(results);
-
-      // 生成模拟的LLM prompt
       const prompt = `你是一位专业的紫微斗数命理师，根据以下资料回答用户的问题：\n\n${context}\n\n用户问题：${query}\n\n请根据上述资料，提供详细、专业的回答。`;
 
-      // 返回结果
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
-        results: results,
-        context: context,
-        prompt: prompt
-      }));
-
+      res.end(JSON.stringify({ results, context, prompt }));
     } catch (error) {
       console.error('RAG test error:', error);
       res.statusCode = 500;
@@ -192,38 +208,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 验证邀请码接口
   if (req.method === 'POST' && req.url === '/api/verify-code') {
     try {
       const body = await parseRequestBody(req);
       const { code } = body;
-      
-      console.log('收到验证请求');
-      console.log('用户输入的 code:', code);
-      console.log('环境变量 AUTH_CODE:', process.env.AUTH_CODE);
-      console.log('是否匹配:', code === process.env.AUTH_CODE);
-      
+
       if (!code) {
-        console.log('错误: 未输入邀请码');
         res.statusCode = 400;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ error: '请输入邀请码' }));
         return;
       }
 
-      // 验证邀请码
       if (code === process.env.AUTH_CODE) {
-        console.log('验证成功');
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ success: true, message: '验证成功' }));
       } else {
-        console.log('验证失败: 邀请码不匹配');
         res.statusCode = 401;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ error: '邀请码错误' }));
       }
-
     } catch (error) {
       console.error('Verify code error:', error);
       res.statusCode = 500;
@@ -233,13 +238,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 404 处理
   res.statusCode = 404;
   res.end();
 });
 
-// 启动服务器
 server.listen(port, () => {
   console.log(`Ziwei server running at http://localhost:${port}`);
 });
-

@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import html2canvas from 'html2canvas';
 import ZiweiChart from '@/components/ZiweiChart';
-import { getLunarBaseYear, getGregorianYearByNominalAge, getEarthlyBranchByYear } from '@/lib/shichen';
+import { getLunarBaseYear, getGregorianYearByNominalAge } from '@/lib/shichen';
 
 interface BirthData {
   birthday: string;
@@ -40,6 +40,7 @@ interface ChartViewProps {
   onSaveCase: () => void;
   onLoadCase: (caseData: SavedCase) => void;
   onDeleteCase: (caseId: string, event: React.MouseEvent) => void;
+  onYearChange?: (year: number) => void;
   onTestAIPrompt?: (savedCase: SavedCase) => void;
 }
 
@@ -56,6 +57,7 @@ export default function ChartView({
   onSaveCase,
   onLoadCase,
   onDeleteCase,
+  onYearChange,
   onTestAIPrompt
 }: ChartViewProps) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -91,14 +93,7 @@ export default function ChartView({
               <ZiweiChart 
                 ziweiData={{
                   astrolabe: ziweiData?.astrolabe,
-                  horoscope: {
-                    decadal: selectedDecadal 
-                      ? ziweiData?.astrolabe?.palaces?.find((p: any) => p.earthlyBranch === selectedDecadal.branch) 
-                      : null,
-                    yearly: selectedYear 
-                      ? ziweiData?.astrolabe?.palaces?.find((p: any) => p.earthlyBranch === getEarthlyBranchByYear(selectedYear))
-                      : null
-                  }
+                  horoscope: ziweiData?.horoscope
                 }}
               />
             </div>
@@ -128,7 +123,10 @@ export default function ChartView({
                             setSelectedYear(null);
                           } else {
                             setSelectedDecadal(decadalInfo);
-                            setSelectedYear(null);
+                            const baseYear = getLunarBaseYear(birthData.birthday);
+                            const firstYear = getGregorianYearByNominalAge(baseYear, Number(decadalInfo.start));
+                            setSelectedYear(firstYear);
+                            onYearChange?.(firstYear);
                           }
                         }}
                         className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
@@ -156,6 +154,7 @@ export default function ChartView({
                               setSelectedYear(null);
                             } else {
                               setSelectedYear(year);
+                              onYearChange?.(year);
                             }
                           }}
                           className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
@@ -255,7 +254,7 @@ export default function ChartView({
             <span className="text-sm text-purple-500 mt-2 font-medium">点击左上角菜单开始排盘</span>
           </div>
           <p className="text-lg">请在左侧输入出生信息开始排盘</p>
-          <p className="mt-2 text-sm opacity-75">按F11全屏浏览效果更佳</p>
+          <p className="hidden md:block mt-2 text-sm opacity-75">按F11全屏浏览效果更佳</p>
         </div>
       )}
     </div>

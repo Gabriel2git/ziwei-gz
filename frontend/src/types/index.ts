@@ -34,16 +34,38 @@ export interface Horoscope {
   };
   decadal?: {
     heavenlyStem: string;
-    range: [number, number];
+    earthlyBranch: string;
+    mutagen?: string[];
   };
   yearly?: {
     heavenlyStem: string;
+    earthlyBranch: string;
+    mutagen?: string[];
   };
+}
+
+export interface DecadalYearlyItem {
+  year: number;
+  yearGanzhi: string;
+  nominalAge: number | null;
+  lifePalaceGanzhi: string;
+  yearlyMutagen: string[];
+  decadalMutagen: string[];
+  decadalEarthlyBranch: string;
+  yearlyEarthlyBranch: string;
+  overlap: '同宫' | '无';
+}
+
+export interface DecadalYearlyInfo {
+  range: [number, number];
+  ageRange: [number, number];
+  years: DecadalYearlyItem[];
 }
 
 export interface ZiweiData {
   astrolabe: Astrolabe;
   horoscope?: Horoscope;
+  decadalYearlyInfo?: DecadalYearlyInfo | null;
   originalTime?: {
     hour: number;
     minute: number;

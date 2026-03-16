@@ -4,6 +4,7 @@ import { Message, PersonaType, getDefaultSystemPrompt, generateMasterPrompt, get
 interface ZiweiData {
   astrolabe: any;
   horoscope?: any;
+  decadalYearlyInfo?: any;
   originalTime?: {
     hour: number;
     minute: number;

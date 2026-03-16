@@ -15,6 +15,7 @@ interface BirthData {
 interface ZiweiData {
   astrolabe: any;
   horoscope?: any;
+  decadalYearlyInfo?: any;
   originalTime?: {
     hour: number;
     minute: number;
