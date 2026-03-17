@@ -138,6 +138,22 @@ export interface ZiweiData {
   targetYear?: number;
 }
 
+export interface ZiweiLiteData {
+  astrolabe: Astrolabe;
+  horoscope?: Horoscope;
+  selectedContext?: SelectedContext;
+  targetYear?: number;
+}
+
+export interface ZiweiContextData {
+  targetYear?: number;
+  selectedContext?: SelectedContext;
+  decadalYearlyInfo?: DecadalYearlyInfo | null;
+  promptDecadalBlocks?: DecadalBlock[];
+}
+
+export type ContextStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 export interface BirthFormData {
   year: number;
   month: number;

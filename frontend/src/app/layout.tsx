@@ -1,10 +1,9 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { Analytics } from "@vercel/analytics/next";
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: "AI 紫微斗数 Pro",
-  description: "智能紫微斗数命理分析应用",
+  title: 'FatePilot',
+  description: '智能紫微斗数命理分析应用',
 };
 
 export default function RootLayout({
@@ -14,10 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body>
-        {children}
-        <Analytics />
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

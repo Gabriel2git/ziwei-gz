@@ -12,6 +12,8 @@ const CURRENT_BASELINE_YEAR = 2026;
 const MIN_YEAR = 1900;
 const MAX_YEAR = 2100;
 const MID_YEAR_ANCHOR = '06-30';
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_MAX_SIZE = 300;
 
 console.log('=== Server Start ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
@@ -19,6 +21,38 @@ console.log('AUTH_CODE exists:', !!process.env.AUTH_CODE);
 
 const retrievalService = new RetrievalService();
 retrievalService.initialize().catch(console.error);
+
+class TTLCache {
+  constructor(maxSize = CACHE_MAX_SIZE, ttlMs = CACHE_TTL_MS) {
+    this.maxSize = maxSize;
+    this.ttlMs = ttlMs;
+    this.cache = new Map();
+  }
+
+  get(key) {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > this.ttlMs) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  set(key, value) {
+    this.cache.set(key, { value, timestamp: Date.now() });
+    if (this.cache.size > this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) {
+        this.cache.delete(firstKey);
+      }
+    }
+  }
+}
+
+const astrolabeCache = new TTLCache();
+const litePayloadCache = new TTLCache();
+const contextPayloadCache = new TTLCache();
 
 function parseRequestBody(req) {
   return new Promise((resolve, reject) => {
@@ -37,8 +71,79 @@ function parseRequestBody(req) {
   });
 }
 
+function getCacheValue(cache, key) {
+  return cache.get(key);
+}
+
+function setCacheValue(cache, key, value) {
+  cache.set(key, value);
+}
+
 function getHoroscopeForYear(astrolabe, year) {
   return astrolabe.horoscope(`${year}-${MID_YEAR_ANCHOR}`);
+}
+
+function normalizeZiweiInput(body) {
+  const birthday = typeof body?.birthday === 'string' ? body.birthday : '';
+  const hourIndex = Number(body?.hourIndex);
+  const gender = typeof body?.gender === 'string' ? body.gender : '';
+  const isLunar = Boolean(body?.isLunar);
+  const isLeap = Boolean(body?.isLeap);
+  const targetYear = body?.targetYear;
+
+  if (!birthday || Number.isNaN(hourIndex) || !gender) {
+    return { error: 'Missing required parameters' };
+  }
+
+  const normalizedTargetYear = targetYear === undefined ? new Date().getFullYear() : Number(targetYear);
+  if (
+    !Number.isInteger(normalizedTargetYear) ||
+    normalizedTargetYear < MIN_YEAR ||
+    normalizedTargetYear > MAX_YEAR
+  ) {
+    return { error: `targetYear must be an integer between ${MIN_YEAR} and ${MAX_YEAR}` };
+  }
+
+  return {
+    input: {
+      birthday,
+      hourIndex,
+      gender,
+      isLunar,
+      isLeap,
+      normalizedTargetYear,
+    },
+  };
+}
+
+function getAstrolabeKey(input) {
+  return [
+    input.birthday,
+    input.hourIndex,
+    input.gender,
+    input.isLunar ? 1 : 0,
+    input.isLeap ? 1 : 0,
+    'zh-CN',
+  ].join('|');
+}
+
+function getYearKey(input, targetYear) {
+  return `${getAstrolabeKey(input)}|${targetYear}|${MID_YEAR_ANCHOR}`;
+}
+
+function getOrCreateAstrolabe(input) {
+  const key = getAstrolabeKey(input);
+  const cached = getCacheValue(astrolabeCache, key);
+  if (cached) {
+    return cached;
+  }
+
+  const astrolabe = input.isLunar
+    ? iztro.astro.byLunar(input.birthday, input.hourIndex, input.gender, input.isLeap, true, 'zh-CN')
+    : iztro.astro.bySolar(input.birthday, input.hourIndex, input.gender, true, 'zh-CN');
+
+  setCacheValue(astrolabeCache, key, astrolabe);
+  return astrolabe;
 }
 
 function safeJsonStringify(payload) {
@@ -324,12 +429,44 @@ function buildSelectedContext(targetYear, horoscope, astrolabe) {
   };
 }
 
+function buildLitePayload(astrolabeRaw, targetYear, horoscopeRaw) {
+  const horoscope = horoscopeRaw || getHoroscopeForYear(astrolabeRaw, targetYear);
+  return {
+    astrolabe: serializeAstrolabe(astrolabeRaw),
+    horoscope: serializeHoroscope(horoscope),
+    targetYear,
+    selectedContext: buildSelectedContext(targetYear, horoscope, astrolabeRaw),
+  };
+}
+
+function buildContextPayload(astrolabeRaw, targetYear, horoscopeRaw) {
+  const horoscope = horoscopeRaw || getHoroscopeForYear(astrolabeRaw, targetYear);
+  return {
+    targetYear,
+    selectedContext: buildSelectedContext(targetYear, horoscope, astrolabeRaw),
+    decadalYearlyInfo: buildDecadalYearlyInfo(astrolabeRaw, targetYear, horoscope),
+    promptDecadalBlocks: buildPromptDecadalBlocks(astrolabeRaw, targetYear, horoscope, 6),
+  };
+}
+
 function classifyZiweiError(error) {
   const message = String(error?.message || error || '');
   if (/circular structure|stringify|serialize/i.test(message)) {
     return 'serialization_error';
   }
   return 'iztro_calc_error';
+}
+
+function normalizeTargetYear(targetYear) {
+  const normalizedTargetYear = targetYear === undefined ? new Date().getFullYear() : Number(targetYear);
+  if (
+    !Number.isInteger(normalizedTargetYear) ||
+    normalizedTargetYear < MIN_YEAR ||
+    normalizedTargetYear > MAX_YEAR
+  ) {
+    return null;
+  }
+  return normalizedTargetYear;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -348,54 +485,127 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && req.url === '/api/ziwei-lite') {
+    try {
+      const normalized = normalizeZiweiInput(await parseRequestBody(req));
+      if (normalized.error) {
+        sendJson(res, 400, { error: normalized.error });
+        return;
+      }
+      const { input } = normalized;
+      const targetYear = input.normalizedTargetYear;
+      const yearKey = getYearKey(input, targetYear);
+
+      const cachedLite = getCacheValue(litePayloadCache, yearKey);
+      if (cachedLite) {
+        sendJson(res, 200, cachedLite);
+        return;
+      }
+
+      const astrolabeRaw = getOrCreateAstrolabe(input);
+      const horoscopeRaw = getHoroscopeForYear(astrolabeRaw, targetYear);
+      const payload = buildLitePayload(astrolabeRaw, targetYear, horoscopeRaw);
+      setCacheValue(litePayloadCache, yearKey, payload);
+
+      console.log(
+        '[ziwei_lite_success]',
+        JSON.stringify({
+          targetYear,
+          anchorDate: `${targetYear}-${MID_YEAR_ANCHOR}`,
+          hasPalaces: Array.isArray(payload.astrolabe?.palaces),
+          palaceCount: payload.astrolabe?.palaces?.length || 0,
+          hasHoroscopeAge: typeof payload.horoscope?.age?.nominalAge === 'number',
+        }),
+      );
+
+      sendJson(res, 200, payload);
+    } catch (error) {
+      const errorType = classifyZiweiError(error);
+      console.error(`[ziwei_lite_error:${errorType}]`, error?.message || error);
+      sendJson(res, 500, { error: error?.message || 'Unknown error', errorType });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && req.url === '/api/ziwei-context') {
+    try {
+      const normalized = normalizeZiweiInput(await parseRequestBody(req));
+      if (normalized.error) {
+        sendJson(res, 400, { error: normalized.error });
+        return;
+      }
+      const { input } = normalized;
+      const targetYear = input.normalizedTargetYear;
+      const yearKey = getYearKey(input, targetYear);
+
+      const cachedContext = getCacheValue(contextPayloadCache, yearKey);
+      if (cachedContext) {
+        sendJson(res, 200, cachedContext);
+        return;
+      }
+
+      const astrolabeRaw = getOrCreateAstrolabe(input);
+      const horoscopeRaw = getHoroscopeForYear(astrolabeRaw, targetYear);
+      const contextPayload = buildContextPayload(astrolabeRaw, targetYear, horoscopeRaw);
+      setCacheValue(contextPayloadCache, yearKey, contextPayload);
+
+      console.log(
+        '[ziwei_context_success]',
+        JSON.stringify({
+          targetYear,
+          anchorDate: `${targetYear}-${MID_YEAR_ANCHOR}`,
+          promptDecadalBlocks: contextPayload.promptDecadalBlocks?.length || 0,
+          hasDecadalYearlyInfo: Boolean(contextPayload.decadalYearlyInfo),
+        }),
+      );
+
+      sendJson(res, 200, contextPayload);
+    } catch (error) {
+      const errorType = classifyZiweiError(error);
+      console.error(`[ziwei_context_error:${errorType}]`, error?.message || error);
+      sendJson(res, 500, { error: error?.message || 'Unknown error', errorType });
+    }
+    return;
+  }
+
   if (req.method === 'POST' && req.url === '/api/ziwei') {
     try {
-      const body = await parseRequestBody(req);
-      const { birthday, hourIndex, gender, isLunar, isLeap, targetYear } = body;
-
-      if (!birthday || hourIndex === undefined || !gender) {
-        sendJson(res, 400, { error: 'Missing required parameters' });
+      const normalized = normalizeZiweiInput(await parseRequestBody(req));
+      if (normalized.error) {
+        sendJson(res, 400, { error: normalized.error });
         return;
       }
+      const { input } = normalized;
+      const targetYear = input.normalizedTargetYear;
+      const yearKey = getYearKey(input, targetYear);
 
-      const normalizedTargetYear = targetYear === undefined ? new Date().getFullYear() : Number(targetYear);
-      if (
-        !Number.isInteger(normalizedTargetYear) ||
-        normalizedTargetYear < MIN_YEAR ||
-        normalizedTargetYear > MAX_YEAR
-      ) {
-        sendJson(res, 400, { error: `targetYear must be an integer between ${MIN_YEAR} and ${MAX_YEAR}` });
-        return;
+      let litePayload = getCacheValue(litePayloadCache, yearKey);
+      let contextPayload = getCacheValue(contextPayloadCache, yearKey);
+
+      const astrolabeRaw = getOrCreateAstrolabe(input);
+      const horoscopeRaw = getHoroscopeForYear(astrolabeRaw, targetYear);
+
+      if (!litePayload) {
+        litePayload = buildLitePayload(astrolabeRaw, targetYear, horoscopeRaw);
+        setCacheValue(litePayloadCache, yearKey, litePayload);
       }
 
-      const astrolabeRaw = isLunar
-        ? iztro.astro.byLunar(birthday, hourIndex, gender, isLeap, true, 'zh-CN')
-        : iztro.astro.bySolar(birthday, hourIndex, gender, true, 'zh-CN');
-
-      const horoscopeRaw = getHoroscopeForYear(astrolabeRaw, normalizedTargetYear);
-      const decadalYearlyInfo = buildDecadalYearlyInfo(astrolabeRaw, normalizedTargetYear, horoscopeRaw);
-      const promptDecadalBlocks = buildPromptDecadalBlocks(
-        astrolabeRaw,
-        normalizedTargetYear,
-        horoscopeRaw,
-        6,
-      );
-      const selectedContext = buildSelectedContext(normalizedTargetYear, horoscopeRaw, astrolabeRaw);
+      if (!contextPayload) {
+        contextPayload = buildContextPayload(astrolabeRaw, targetYear, horoscopeRaw);
+        setCacheValue(contextPayloadCache, yearKey, contextPayload);
+      }
 
       const payload = {
-        astrolabe: serializeAstrolabe(astrolabeRaw),
-        horoscope: serializeHoroscope(horoscopeRaw),
-        targetYear: normalizedTargetYear,
-        decadalYearlyInfo,
-        promptDecadalBlocks,
-        selectedContext,
+        ...litePayload,
+        decadalYearlyInfo: contextPayload.decadalYearlyInfo,
+        promptDecadalBlocks: contextPayload.promptDecadalBlocks,
       };
 
       console.log(
         '[ziwei_api_success]',
         JSON.stringify({
-          targetYear: normalizedTargetYear,
-          anchorDate: `${normalizedTargetYear}-${MID_YEAR_ANCHOR}`,
+          targetYear,
+          anchorDate: `${targetYear}-${MID_YEAR_ANCHOR}`,
           hasPalaces: Array.isArray(payload.astrolabe?.palaces),
           palaceCount: payload.astrolabe?.palaces?.length || 0,
           hasHoroscopeAge: typeof payload.horoscope?.age?.nominalAge === 'number',

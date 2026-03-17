@@ -1,6 +1,6 @@
-﻿import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { getShichenIndexFromHour } from '@/lib/shichen';
-import type { ZiweiData } from '@/types';
+import type { ContextStatus, ZiweiContextData, ZiweiData, ZiweiLiteData } from '@/types';
 
 interface BirthData {
   birthday: string;
@@ -16,36 +16,19 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const MAX_RETRY = 3;
 const RETRY_DELAY = 1000;
 
-class ZiweiCache {
-  private cache: Map<string, { data: ZiweiData; timestamp: number }>;
+class DataCache<T> {
+  private cache = new Map<string, { data: T; timestamp: number }>();
   private maxAge: number;
 
   constructor(maxAge: number = 3600000) {
-    this.cache = new Map();
     this.maxAge = maxAge;
   }
 
-  private generateKey(birthData: BirthData, targetYear: number): string {
-    return [
-      birthData.birthday,
-      birthData.birthTime,
-      birthData.birthMinute,
-      birthData.birthdayType,
-      birthData.gender,
-      birthData.longitude,
-      birthData.isLeap,
-      targetYear,
-    ].join('_');
-  }
-
-  get(birthData: BirthData, targetYear: number): ZiweiData | null {
-    const key = this.generateKey(birthData, targetYear);
+  get(key: string): T | null {
     const cached = this.cache.get(key);
-
     if (!cached) return null;
 
-    const now = Date.now();
-    if (now - cached.timestamp > this.maxAge) {
+    if (Date.now() - cached.timestamp > this.maxAge) {
       this.cache.delete(key);
       return null;
     }
@@ -53,33 +36,52 @@ class ZiweiCache {
     return cached.data;
   }
 
-  set(birthData: BirthData, targetYear: number, data: ZiweiData): void {
-    const key = this.generateKey(birthData, targetYear);
+  set(key: string, data: T) {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
     });
-
-    this.cleanup();
-  }
-
-  private cleanup(): void {
-    const now = Date.now();
-    this.cache.forEach((value, key) => {
-      if (now - value.timestamp > this.maxAge) {
-        this.cache.delete(key);
-      }
-    });
   }
 }
 
-const ziweiCache = new ZiweiCache();
+const liteCache = new DataCache<ZiweiLiteData>();
+const contextCache = new DataCache<ZiweiContextData>();
+
+function getRequestKey(birthData: BirthData, targetYear: number) {
+  return [
+    birthData.birthday,
+    birthData.birthTime,
+    birthData.birthMinute,
+    birthData.birthdayType,
+    birthData.gender,
+    birthData.longitude,
+    birthData.isLeap,
+    targetYear,
+  ].join('_');
+}
+
+function mergeZiweiData(
+  liteData: ZiweiLiteData | null,
+  contextData: ZiweiContextData | null,
+  originalTime?: { hour: number; minute: number },
+): ZiweiData | null {
+  if (!liteData) return null;
+
+  return {
+    ...liteData,
+    ...contextData,
+    selectedContext: contextData?.selectedContext || liteData.selectedContext,
+    originalTime,
+  };
+}
 
 export function useZiweiData() {
   const [ziweiData, setZiweiData] = useState<ZiweiData | null>(null);
   const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const [contextStatus, setContextStatus] = useState<ContextStatus>('idle');
   const [horoscopeYear, setHoroscopeYear] = useState(new Date().getFullYear());
   const [error, setError] = useState<string | null>(null);
+  const activeRequestKeyRef = useRef<string>('');
 
   const fetchWithRetry = async (url: string, options: RequestInit, retryCount: number = 0): Promise<Response> => {
     try {
@@ -97,54 +99,135 @@ export function useZiweiData() {
     }
   };
 
-  const fetchZiweiData = async (data: BirthData, targetYear: number): Promise<ZiweiData> => {
-    const shichenIndex = getShichenIndexFromHour(data.birthTime);
-    const response = await fetchWithRetry(`${API_BASE_URL}/api/ziwei`, {
+  const buildRequestBody = (data: BirthData, targetYear: number) => ({
+    birthday: data.birthday,
+    hourIndex: getShichenIndexFromHour(data.birthTime),
+    minute: data.birthMinute,
+    gender: data.gender,
+    isLunar: data.birthdayType === 'lunar',
+    isLeap: data.isLeap,
+    longitude: data.longitude,
+    targetYear,
+  });
+
+  const fetchLiteData = async (data: BirthData, targetYear: number): Promise<ZiweiLiteData> => {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/ziwei-lite`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        birthday: data.birthday,
-        hourIndex: shichenIndex,
-        minute: data.birthMinute,
-        gender: data.gender,
-        isLunar: data.birthdayType === 'lunar',
-        isLeap: data.isLeap,
-        longitude: data.longitude,
-        targetYear,
-      }),
+      body: JSON.stringify(buildRequestBody(data, targetYear)),
     });
+    return response.json();
+  };
 
-    const realZiweiData: ZiweiData = await response.json();
-    realZiweiData.originalTime = { hour: data.birthTime, minute: data.birthMinute };
+  const fetchContextData = async (data: BirthData, targetYear: number): Promise<ZiweiContextData> => {
+    const response = await fetchWithRetry(`${API_BASE_URL}/api/ziwei-context`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildRequestBody(data, targetYear)),
+    });
+    return response.json();
+  };
 
-    if (realZiweiData.selectedContext) {
-      realZiweiData.selectedContext = {
-        ...realZiweiData.selectedContext,
-        targetYear,
-      };
+  const attachOriginalTime = (data: BirthData) => ({
+    hour: data.birthTime,
+    minute: data.birthMinute,
+  });
+
+  const prefetchZiweiContext = async (birthData: BirthData, targetYear: number) => {
+    const requestKey = getRequestKey(birthData, targetYear);
+    const cachedContext = contextCache.get(requestKey);
+    if (cachedContext) {
+      setContextStatus('ready');
+      return cachedContext;
     }
 
-    return realZiweiData;
+    setContextStatus('loading');
+
+    try {
+      const contextData = await fetchContextData(birthData, targetYear);
+      contextCache.set(requestKey, contextData);
+
+      if (activeRequestKeyRef.current === requestKey) {
+        setZiweiData((prev) => mergeZiweiData(prev as ZiweiLiteData, contextData, attachOriginalTime(birthData)));
+        setContextStatus('ready');
+      }
+
+      return contextData;
+    } catch (err) {
+      if (activeRequestKeyRef.current === requestKey) {
+        setContextStatus('error');
+      }
+      throw err;
+    }
+  };
+
+  const ensureZiweiContext = async (birthData: BirthData, targetYear: number = horoscopeYear): Promise<ZiweiData | null> => {
+    const requestKey = getRequestKey(birthData, targetYear);
+    const originalTime = attachOriginalTime(birthData);
+    const cachedLite = liteCache.get(requestKey);
+    const cachedContext = contextCache.get(requestKey);
+
+    if (cachedLite && cachedContext) {
+      const merged = mergeZiweiData(cachedLite, cachedContext, originalTime);
+      if (activeRequestKeyRef.current === requestKey) {
+        setZiweiData(merged);
+        setContextStatus('ready');
+      }
+      return merged;
+    }
+
+    const liteData = cachedLite || (await fetchLiteData(birthData, targetYear));
+    if (!cachedLite) {
+      liteCache.set(requestKey, liteData);
+    }
+
+    const contextData = cachedContext || (await prefetchZiweiContext(birthData, targetYear));
+    const merged = mergeZiweiData(liteData, contextData, originalTime);
+
+    if (activeRequestKeyRef.current === requestKey) {
+      setZiweiData(merged);
+      setContextStatus('ready');
+    }
+
+    return merged;
   };
 
   const loadZiweiData = async (data: BirthData): Promise<ZiweiData> => {
     setError(null);
     const targetYear = horoscopeYear;
+    const requestKey = getRequestKey(data, targetYear);
+    activeRequestKeyRef.current = requestKey;
 
     try {
-      const cachedData = ziweiCache.get(data, targetYear);
-      if (cachedData) {
-        setZiweiData(cachedData);
-        return cachedData;
+      const cachedLite = liteCache.get(requestKey);
+      const cachedContext = contextCache.get(requestKey);
+      const originalTime = attachOriginalTime(data);
+
+      if (cachedLite) {
+        const merged = mergeZiweiData(cachedLite, cachedContext, originalTime);
+        if (merged) {
+          setZiweiData(merged);
+          setContextStatus(cachedContext ? 'ready' : 'loading');
+          if (!cachedContext) {
+            void prefetchZiweiContext(data, targetYear);
+          }
+          return merged;
+        }
       }
 
-      const realZiweiData = await fetchZiweiData(data, targetYear);
-      ziweiCache.set(data, targetYear, realZiweiData);
-      setZiweiData(realZiweiData);
-      return realZiweiData;
+      const liteData = await fetchLiteData(data, targetYear);
+      liteCache.set(requestKey, liteData);
+      const merged = mergeZiweiData(liteData, cachedContext, originalTime) as ZiweiData;
+      setZiweiData(merged);
+      setContextStatus(cachedContext ? 'ready' : 'loading');
+      if (!cachedContext) {
+        void prefetchZiweiContext(data, targetYear);
+      }
+      return merged;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(`获取命盘数据失败: ${errorMessage}`);
+      setContextStatus('error');
       throw err;
     }
   };
@@ -154,23 +237,39 @@ export function useZiweiData() {
 
     setIsRefreshingData(true);
     setError(null);
+    const requestKey = getRequestKey(birthData, newYear);
+    activeRequestKeyRef.current = requestKey;
 
     try {
-      const cachedData = ziweiCache.get(birthData, newYear);
-      if (cachedData) {
+      const cachedLite = liteCache.get(requestKey);
+      const cachedContext = contextCache.get(requestKey);
+      const originalTime = attachOriginalTime(birthData);
+
+      if (cachedLite) {
+        const merged = mergeZiweiData(cachedLite, cachedContext, originalTime) as ZiweiData;
         setHoroscopeYear(newYear);
-        setZiweiData(cachedData);
-        return cachedData;
+        setZiweiData(merged);
+        setContextStatus(cachedContext ? 'ready' : 'loading');
+        if (!cachedContext) {
+          void prefetchZiweiContext(birthData, newYear);
+        }
+        return merged;
       }
 
       setHoroscopeYear(newYear);
-      const realZiweiData = await fetchZiweiData(birthData, newYear);
-      ziweiCache.set(birthData, newYear, realZiweiData);
-      setZiweiData(realZiweiData);
-      return realZiweiData;
+      const liteData = await fetchLiteData(birthData, newYear);
+      liteCache.set(requestKey, liteData);
+      const merged = mergeZiweiData(liteData, cachedContext, originalTime) as ZiweiData;
+      setZiweiData(merged);
+      setContextStatus(cachedContext ? 'ready' : 'loading');
+      if (!cachedContext) {
+        void prefetchZiweiContext(birthData, newYear);
+      }
+      return merged;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(`更新命盘数据失败: ${errorMessage}`);
+      setContextStatus('error');
       throw err;
     } finally {
       setIsRefreshingData(false);
@@ -180,10 +279,12 @@ export function useZiweiData() {
   return {
     ziweiData,
     isRefreshingData,
+    contextStatus,
     horoscopeYear,
     error,
     loadZiweiData,
     updateHoroscopeYear,
+    ensureZiweiContext,
     setZiweiData,
     setError,
   };

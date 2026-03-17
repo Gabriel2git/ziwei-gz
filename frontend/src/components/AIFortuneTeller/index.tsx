@@ -1,4 +1,4 @@
-﻿'use client';
+﻿﻿﻿﻿'use client';
 
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -6,12 +6,15 @@ import AuthGuard from '@/components/AuthGuard';
 import PersonaSelector from '@/components/PersonaSelector';
 import AIChat from '@/components/AIChat';
 import { PersonaType } from '@/lib/ai';
+import type { ContextStatus } from '@/types';
 
 interface AIFortuneTellerProps {
   messages: any[];
   inputMessage: string;
   setInputMessage: (msg: string) => void;
   isLoading: boolean;
+  loadingStage: 'context' | 'model';
+  contextStatus: ContextStatus;
   debugPrompt: string;
   showDebug: boolean;
   setShowDebug: (show: boolean) => void;
@@ -37,6 +40,8 @@ function AIFortuneTellerContent({
   inputMessage,
   setInputMessage,
   isLoading,
+  loadingStage,
+  contextStatus,
   debugPrompt,
   showDebug,
   setShowDebug,
@@ -117,6 +122,8 @@ function AIFortuneTellerContent({
           inputMessage={inputMessage}
           setInputMessage={setInputMessage}
           isLoading={isLoading}
+          loadingStage={loadingStage}
+          contextStatus={contextStatus}
           debugPrompt={debugPrompt}
           showDebug={showDebug}
           setShowDebug={setShowDebug}

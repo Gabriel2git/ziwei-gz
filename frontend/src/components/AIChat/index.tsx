@@ -1,5 +1,6 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Message } from '@/lib/ai';
+import type { ContextStatus } from '@/types';
 
 interface BirthData {
   birthday: string;
@@ -15,6 +16,8 @@ interface AIChatProps {
   inputMessage: string;
   setInputMessage: (message: string) => void;
   isLoading: boolean;
+  loadingStage: 'context' | 'model';
+  contextStatus: ContextStatus;
   debugPrompt: string;
   showDebug: boolean;
   setShowDebug: (show: boolean) => void;
@@ -37,6 +40,8 @@ export default function AIChat({
   inputMessage,
   setInputMessage,
   isLoading,
+  loadingStage,
+  contextStatus,
   debugPrompt,
   showDebug,
   setShowDebug,
@@ -53,7 +58,12 @@ export default function AIChat({
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
 
-  const loadingText = useMemo(() => LOADING_TEXTS[waitingSeconds % LOADING_TEXTS.length], [waitingSeconds]);
+  const loadingText = useMemo(() => {
+    if (loadingStage === 'context') {
+      return '正在准备完整命盘上下文';
+    }
+    return LOADING_TEXTS[waitingSeconds % LOADING_TEXTS.length];
+  }, [loadingStage, waitingSeconds]);
 
   const scrollToBottom = () => {
     if (!messagesContainerRef.current) return;
@@ -99,7 +109,27 @@ export default function AIChat({
     <div className="h-full flex flex-col relative pb-16 md:pb-0">
       <div className="flex justify-between items-center mb-2 sm:mb-4">
         <h2 className="text-sm sm:text-xl font-bold text-gray-900 dark:text-gray-100">AI 命理师</h2>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          <span
+            className={`hidden sm:inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${
+              contextStatus === 'ready'
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                : contextStatus === 'loading'
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                  : contextStatus === 'error'
+                    ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+            }`}
+          >
+            {contextStatus === 'ready'
+              ? 'AI上下文已就绪'
+              : contextStatus === 'loading'
+                ? 'AI上下文预热中'
+                : contextStatus === 'error'
+                  ? 'AI上下文加载失败'
+                  : '等待命盘数据'}
+          </span>
+
           {isLoading ? (
             <button
               onClick={stopGeneration}

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { getShichenFromHour } from '@/lib/shichen';
@@ -166,7 +166,7 @@ export default function BirthForm({ onDataLoaded }: BirthFormProps) {
               onChange={() => setForm((prev) => ({ ...prev, isLunar: false }))}
               className="mr-2 text-purple-600"
             />
-            <span className="text-gray-900 dark:text-gray-100">阳历</span>
+            <span className="text-gray-900 dark:text-gray-100">阳历（推荐）</span>
           </label>
           <label className="flex items-center cursor-pointer bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-lg border-2 border-transparent hover:border-purple-300 dark:hover:border-purple-700 transition-all text-sm">
             <input

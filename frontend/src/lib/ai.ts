@@ -1,4 +1,4 @@
-﻿import type { DecadalBlock, Palace, SelectedContext, ZiweiData } from '@/types';
+﻿﻿import type { DecadalBlock, Palace, SelectedContext, ZiweiData } from '@/types';
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -54,7 +54,7 @@ export const PERSONA_PROMPTS: Record<PersonaType, string> = {
   healer: '你是“共情且可执行”的紫微助手。请在分析后给出具体可执行建议。',
 };
 
-export const AI_MODELS = ['glm-4.7', 'qwen3.5-flash', 'kimi-k2.5'];
+export const AI_MODELS = ['qwen3-max', 'glm-4.7', 'qwen3.5-flash', 'kimi-k2.5'];
 
 const MUTAGEN_LABELS = ['禄', '权', '科', '忌'];
 

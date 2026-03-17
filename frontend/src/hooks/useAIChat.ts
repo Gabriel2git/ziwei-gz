@@ -1,11 +1,19 @@
-﻿import { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Message, PersonaType, generateMasterPrompt, getDefaultSystemPrompt, getLLMResponse } from '@/lib/ai';
-import type { ZiweiData } from '@/types';
+import type { ContextStatus, ZiweiData } from '@/types';
 
-export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
+type LoadingStage = 'context' | 'model';
+
+export function useAIChat(
+  ziweiData: ZiweiData | null,
+  horoscopeYear: number,
+  resolveZiweiData?: () => Promise<ZiweiData | null>,
+  contextStatus: ContextStatus = 'idle',
+) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<LoadingStage>('model');
   const [debugPrompt, setDebugPrompt] = useState<string>('');
   const [selectedPersona, setSelectedPersona] = useState<PersonaType>('companion');
 
@@ -22,7 +30,9 @@ export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
       {
         role: 'assistant',
         content:
-          '你好，我已经读取你的命盘与当前大限/流年信息。\n你可以问我：\n1. 格局与职业\n2. 情感与关系\n3. 当前年份重点风险与机会',
+          contextStatus === 'ready'
+            ? '你好，我已经读取你的完整命盘、大限和流年上下文。你可以直接开始提问。'
+            : '你好，我已经加载命盘主数据，完整大限流年上下文正在后台准备。你可以先看命盘，提问时我会自动补全上下文。',
       },
     ]);
     setDebugPrompt(`=== 系统提示词 ===\n${fullPrompt}`);
@@ -36,7 +46,9 @@ export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
       {
         role: 'assistant',
         content:
-          '已根据你最新选择的大限/流年更新解盘上下文。你可以继续追问：\n1. 这个年份最重要的判断\n2. 事业和关系优先级\n3. 如何规避风险并执行',
+          contextStatus === 'ready'
+            ? '已根据你最新选择的大限/流年更新完整解盘上下文。'
+            : '命盘年份已切换，完整 AI 上下文正在后台刷新。提问时我会自动等待上下文准备完成。',
       },
     ]);
     setDebugPrompt(`=== 系统提示词 ===\n${fullPrompt}`);
@@ -50,14 +62,23 @@ export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
     setMessages(newMessages);
     setInputMessage('');
     setIsLoading(true);
+    setLoadingStage('context');
 
     abortControllerRef.current = new AbortController();
 
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
     try {
-      const systemPrompt = ziweiData
-        ? generateMasterPrompt(inputMessage, ziweiData, ziweiData.targetYear || horoscopeYear, selectedPersona)
+      const resolvedZiweiData = resolveZiweiData ? await resolveZiweiData() : ziweiData;
+      setLoadingStage('model');
+
+      const systemPrompt = resolvedZiweiData
+        ? generateMasterPrompt(
+            inputMessage,
+            resolvedZiweiData,
+            resolvedZiweiData.targetYear || horoscopeYear,
+            selectedPersona,
+          )
         : getDefaultSystemPrompt();
 
       const dynamicMessages: Message[] = [
@@ -74,6 +95,7 @@ export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
 
       const tempMessageIndex = newMessages.length;
       setMessages([...newMessages, { role: 'assistant', content: '' }]);
+      setDebugPrompt(`=== 系统提示词 ===\n${systemPrompt}`);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -99,7 +121,7 @@ export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
               return updated;
             });
           } catch {
-            // Ignore malformed stream lines
+            // Ignore malformed stream lines.
           }
         }
       }
@@ -138,10 +160,11 @@ export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
         try {
           reader.releaseLock();
         } catch {
-          // ignore
+          // Ignore release errors.
         }
       }
       setIsLoading(false);
+      setLoadingStage('model');
       abortControllerRef.current = null;
     }
   };
@@ -199,6 +222,7 @@ export function useAIChat(ziweiData: ZiweiData | null, horoscopeYear: number) {
     inputMessage,
     setInputMessage,
     isLoading,
+    loadingStage,
     debugPrompt,
     setDebugPrompt,
     selectedPersona,

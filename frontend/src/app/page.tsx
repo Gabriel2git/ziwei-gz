@@ -1,4 +1,4 @@
-﻿'use client';
+﻿﻿﻿﻿﻿﻿﻿﻿'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AI_MODELS } from '@/lib/ai';
@@ -9,6 +9,7 @@ import Sidebar, { type PageType } from '@/components/Sidebar';
 import ChartView from '@/components/ChartView';
 import RagTest from '@/components/RagTest';
 import AIFortuneTeller from '@/components/AIFortuneTeller';
+import ModelLatencyTest from '@/components/ModelLatencyTest';
 
 interface BirthData {
   birthday: string;
@@ -28,7 +29,7 @@ interface DecadalInfo {
 }
 
 export default function Home() {
-  const [currentPage, setCurrentPage] = useState<PageType>('chart');
+  const [currentPage, setCurrentPage] = useState<PageType | 'model-test'>('chart');
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
   const [darkMode, setDarkMode] = useState(false);
 
@@ -102,13 +103,28 @@ export default function Home() {
   const [selectedDecadal, setSelectedDecadal] = useState<DecadalInfo | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
-  const { ziweiData, isRefreshingData, horoscopeYear, error, loadZiweiData, updateHoroscopeYear, setError } = useZiweiData();
+  const {
+    ziweiData,
+    isRefreshingData,
+    contextStatus,
+    horoscopeYear,
+    error,
+    loadZiweiData,
+    updateHoroscopeYear,
+    ensureZiweiContext,
+    setError,
+  } = useZiweiData();
+  const resolveCompleteZiweiData = useCallback(async () => {
+    if (!birthData) return ziweiData;
+    return ensureZiweiContext(birthData, horoscopeYear);
+  }, [birthData, ensureZiweiContext, horoscopeYear, ziweiData]);
   const {
     messages,
     setMessages,
     inputMessage,
     setInputMessage,
     isLoading,
+    loadingStage,
     debugPrompt,
     setDebugPrompt,
     selectedPersona,
@@ -121,7 +137,7 @@ export default function Home() {
     saveChatHistory,
     loadChatHistory,
     stopGeneration,
-  } = useAIChat(ziweiData, horoscopeYear);
+  } = useAIChat(ziweiData, horoscopeYear, resolveCompleteZiweiData, contextStatus);
   const { savedCases, saveCase, deleteCase } = useSavedCases();
 
   const toggleDarkMode = () => {
@@ -281,7 +297,7 @@ export default function Home() {
               <span>☰</span>
               <span className="text-sm font-bold">菜单</span>
             </button>
-            <h1 className="text-lg font-bold text-purple-700 dark:text-purple-400">AI 紫微斗数</h1>
+            <h1 className="text-lg font-bold text-purple-700 dark:text-purple-400">FatePilot</h1>
             <div className="w-16" />
           </div>
 
@@ -309,6 +325,8 @@ export default function Home() {
                 inputMessage={inputMessage}
                 setInputMessage={setInputMessage}
                 isLoading={isLoading}
+                loadingStage={loadingStage}
+                contextStatus={contextStatus}
                 debugPrompt={debugPrompt}
                 showDebug={showDebug}
                 setShowDebug={setShowDebug}
@@ -329,8 +347,10 @@ export default function Home() {
                 stopGeneration={stopGeneration}
               />
             </div>
-          ) : (
+          ) : currentPage === 'rag' ? (
             <RagTest onBack={() => setCurrentPage('ai')} />
+          ) : (
+            <ModelLatencyTest />
           )}
         </main>
       </div>
@@ -358,6 +378,13 @@ export default function Home() {
             >
               <span className="text-lg">🔍</span>
               <span className="text-xs">RAG</span>
+            </button>
+            <button
+              onClick={() => setCurrentPage('model-test')}
+              className={`flex flex-col items-center p-2 ${currentPage === 'model-test' ? 'text-purple-600' : 'text-gray-600'}`}
+            >
+              <span className="text-lg">⚡</span>
+              <span className="text-xs">测速</span>
             </button>
           </div>
         </div>
