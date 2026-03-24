@@ -1,4 +1,4 @@
-﻿﻿﻿﻿import { useMemo, useRef } from 'react';
+﻿﻿﻿﻿﻿import { useMemo, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import ZiweiChart from '@/components/ZiweiChart';
 
@@ -275,17 +275,17 @@ export default function ChartView({
         <div className="flex flex-col items-center justify-center h-full text-gray-600 dark:text-gray-300 px-6">
           <div className="mb-6 text-center">
             <div className="inline-flex items-center gap-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-4 py-2 rounded-full font-bold text-sm md:text-base">
-              <span>点击左侧菜单开始使用</span>
+              <span>点击顶部导航栏开始使用</span>
             </div>
           </div>
 
           <div className="w-full max-w-2xl bg-white dark:bg-[#1a2a2a] border border-purple-200 dark:border-purple-800 rounded-2xl p-5 md:p-6 shadow-lg">
             <h3 className="text-lg md:text-xl font-extrabold text-gray-900 dark:text-gray-100 mb-4">完整使用流程</h3>
             <ol className="list-decimal list-inside space-y-2 text-sm md:text-base text-gray-700 dark:text-gray-300">
-              <li>点击左侧菜单（桌面）或底部菜单（手机）进入设置面板。</li>
-              <li>输入出生信息后点击“开始排盘”。</li>
+              <li>点击顶部导航栏（桌面）或底部菜单（手机）进入相应页面。</li>
+              <li>在侧边栏输入出生信息后点击“开始排盘”。</li>
               <li>在命盘页点击大限/流年按钮，观察命盘动态边框变化。</li>
-              <li>切到 AI 聊天页，选择命理师并开始提问。</li>
+              <li>在顶部导航栏切到 AI 命理师页面，选择命理师并开始提问。</li>
             </ol>
           </div>
         </div>

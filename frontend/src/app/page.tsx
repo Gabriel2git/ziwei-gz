@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿'use client';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AI_MODELS } from '@/lib/ai';
@@ -227,17 +227,60 @@ export default function Home() {
     }
   };
 
+  // 导航项配置
+  const navItems = [
+    { id: 'chart', label: '命盘显示', icon: '📊' },
+    { id: 'ai', label: 'AI 命理师', icon: '🤖' },
+    { id: 'rag', label: 'RAG 测试', icon: '🔍' },
+  ] as const;
+
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-purple-50 to-blue-50 dark:from-[#0f1a1a] dark:to-[#0a1414]">
-      <div className="flex h-full">
+      {/* 顶部二级导航栏 */}
+      <header className="hidden md:flex items-center justify-between px-6 py-3 bg-white dark:bg-[#1a2a2a] border-b border-gray-200 dark:border-gray-700 shadow-sm z-20">
+        <div className="flex items-center gap-8">
+          <h1 className="text-xl font-bold text-purple-700 dark:text-purple-400">FatePilot</h1>
+          <nav className="flex items-center gap-1">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setCurrentPage(item.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  currentPage === item.id
+                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                <span className="mr-2">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="px-3 py-1.5 rounded-full border border-purple-200 bg-purple-50 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-200"
+          >
+            快速上手
+          </button>
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            aria-label={darkMode ? '切换到浅色模式' : '切换到深色模式'}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
+        </div>
+      </header>
+
+      <div className="flex h-[calc(100vh-56px)]">
         <div ref={sidebarRef} className="hidden md:block relative flex-shrink-0" style={{ width: sidebarWidth }}>
           <Sidebar
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
             selectedModel={selectedModel}
             setSelectedModel={setSelectedModel}
-            darkMode={darkMode}
-            toggleDarkMode={toggleDarkMode}
             onDataLoaded={handleDataLoaded}
           />
 
@@ -270,8 +313,6 @@ export default function Home() {
                   }}
                   selectedModel={selectedModel}
                   setSelectedModel={setSelectedModel}
-                  darkMode={darkMode}
-                  toggleDarkMode={toggleDarkMode}
                   onDataLoaded={handleDataLoaded}
                 />
               </div>

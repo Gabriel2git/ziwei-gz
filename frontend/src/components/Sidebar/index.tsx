@@ -9,8 +9,6 @@ interface SidebarProps {
   setCurrentPage: (page: PageType | 'model-test') => void;
   selectedModel: string;
   setSelectedModel: (model: string) => void;
-  darkMode: boolean;
-  toggleDarkMode: () => void;
   onDataLoaded: (data: any) => void;
 }
 
@@ -19,74 +17,20 @@ export default function Sidebar({
   setCurrentPage,
   selectedModel,
   setSelectedModel,
-  darkMode,
-  toggleDarkMode,
   onDataLoaded,
 }: SidebarProps) {
   const [showQuickStart, setShowQuickStart] = useState(false);
 
   return (
     <aside className="w-full bg-white dark:bg-[#1a2a2a] shadow-xl p-4 lg:p-5 flex flex-col h-full overflow-y-auto">
-      <div className="hidden md:flex justify-between items-center mb-5">
-        <h1 className="text-2xl font-bold text-purple-700 dark:text-purple-400">FatePilot</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowQuickStart((prev) => !prev)}
-            className="px-3 py-1.5 rounded-full border border-purple-200 bg-purple-50 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-200"
-          >
-            快速上手
-          </button>
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-            aria-label={darkMode ? '切换到浅色模式' : '切换到深色模式'}
-          >
-            {darkMode ? '☀️' : '🌙'}
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-4 md:mb-5">
-        <div className="flex items-center justify-between md:block">
-          <button
-            onClick={() => setShowQuickStart((prev) => !prev)}
-            className="md:hidden px-3 py-1.5 rounded-full border border-purple-200 bg-purple-50 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-200"
-          >
-            快速上手
-          </button>
-        </div>
-      </div>
-
-      <div className="hidden md:block mb-4 space-y-2">
+      {/* 移动端标题栏 */}
+      <div className="md:hidden flex justify-between items-center mb-5">
+        <h1 className="text-xl font-bold text-purple-700 dark:text-purple-400">FatePilot</h1>
         <button
-          onClick={() => setCurrentPage('chart')}
-          className={`w-full text-left px-4 py-2 rounded-lg transition-all ${
-            currentPage === 'chart'
-              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400 font-semibold'
-              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-          }`}
+          onClick={() => setShowQuickStart((prev) => !prev)}
+          className="px-3 py-1.5 rounded-full border border-purple-200 bg-purple-50 text-xs font-semibold text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-200"
         >
-          命盘显示
-        </button>
-        <button
-          onClick={() => setCurrentPage('ai')}
-          className={`w-full text-left px-4 py-2 rounded-lg transition-all ${
-            currentPage === 'ai'
-              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400 font-semibold'
-              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-          }`}
-        >
-          AI 命理师
-        </button>
-        <button
-          onClick={() => setCurrentPage('rag')}
-          className={`w-full text-left px-4 py-2 rounded-lg transition-all ${
-            currentPage === 'rag'
-              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400 font-semibold'
-              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-          }`}
-        >
-          RAG 测试
+          快速上手
         </button>
       </div>
 
@@ -101,10 +45,11 @@ export default function Sidebar({
               收起
             </button>
           </div>
-          <p>1. 先在下方输入出生日期和时辰。</p>
-          <p>2. 点击“开始排盘”后查看命盘。</p>
-          <p>3. 点击大限和流年按钮观察命盘边框反馈。</p>
-          <p>4. 切到 AI 命理师页面继续提问。</p>
+          <p>1. 在侧边栏输入出生日期和时辰。</p>
+          <p>2. 点击“开始排盘”后在命盘显示页面查看结果。</p>
+          <p>3. 在命盘页点击大限和流年按钮观察命盘边框反馈。</p>
+          <p>4. 在顶部导航栏切到 AI 命理师页面继续提问。</p>
+          <p>5. 可在 AI 模型部分测试不同模型的延迟性能。</p>
         </div>
       )}
 
