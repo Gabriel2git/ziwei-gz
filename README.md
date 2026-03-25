@@ -1,350 +1,215 @@
-# FatePilot
+﻿# FatePilot
 
-一个基于 React + Next.js 和 Node.js 的智能紫微斗数命理分析应用，集成 AI 命理师功能和 RAG 检索增强生成能力。
+FatePilot 是一个面向紫微斗数分析的全栈项目，核心由 **Next.js 前端 + Node.js iztro 计算服务 + RAG 检索服务 + 邀请码鉴权** 组成。
 
-## ✨ 功能特点
+本文档以“当前可运行状态”为准，并补充项目关键迭代里程碑，作为唯一权威入口。
 
-- 📊 **紫微斗数排盘** - 完整的命盘计算与展示，包括主星、辅星、小星等信息
-- 🤖 **AI 命理师** - 基于 AI 模型的智能命理分析，支持多种命理师人格
-- 🔐 **邀请码验证** - 功德码验证机制，保护 AI 功能不被滥用
-- 🧠 **RAG 检索增强** - 集成知识库检索，提供更准确的命理分析
-- 📱 **响应式设计** - 完美适配电脑端和手机端
-- ⏰ **真太阳时校验** - 基于经度的真太阳时计算
-- 🎨 **美观界面** - 参考文墨天机设计，信息密度高
-- 🔄 **四化计算** - 完整的四化（禄、权、科、忌）计算
-- 📅 **大运流年** - 包含大限和流年信息
-- 🎭 **多种命理师人格** - 大白话解盘伴侣、硬核紫微导师、人生导航与疗愈师
+## 项目概览
 
-## 🛠️ 技术栈
+FatePilot 当前提供以下核心能力：
+
+- 紫微斗数排盘：基于 `iztro` 生成完整命盘（主星/辅星/小星/神煞/运限）
+- 运限联动：支持大限、流年切换与动态展示
+- AI 命理分析：多 persona、多模型、结构化系统提示词
+- 星曜级动态四化：在 Prompt 中按星曜标注本命/大限/流年四化信息
+- RAG 检索增强：检索命理知识库并注入上下文
+- 邀请码鉴权：保护 AI 功能调用
+- 响应式 UI：桌面与移动端双端可用
+
+## 技术架构
 
 ### 前端
-- **React 18** - 前端 UI 库
-- **Next.js 14** - React 框架
-- **TypeScript** - 类型安全
-- **Tailwind CSS** - 实用优先的 CSS 框架
+
+- Next.js 14
+- React 18
+- TypeScript
+- Tailwind CSS
 
 ### 后端
-- **Node.js** - 紫微斗数计算服务
-- **iztro** - 紫微斗数计算库
-- **阿里云百炼** - AI 模型和向量嵌入服务
 
-### 部署
-- **Vercel** - 前端部署
-- **Render** - 后端 API 部署
+- Node.js（`src/server.js`）
+- `iztro`（命盘与运限计算）
+- RAG 服务（`backend/services/retrievalService.js`）
 
-## 📁 项目结构
+### AI 与模型
 
-```
-ziwei_project/
-├── frontend/                 # React + Next.js 前端
-│   ├── src/
-│   │   ├── app/              # Next.js 应用路由
-│   │   ├── components/       # UI 组件
-│   │   │   ├── AIChat/       # AI 聊天组件
-│   │   │   ├── AIFortuneTeller/  # AI 命理师主组件
-│   │   │   ├── AuthGuard/    # 邀请码验证组件
-│   │   │   ├── ChartView/    # 命盘视图组件
-│   │   │   ├── PersonaSelector/  # 命理师选择组件
-│   │   │   ├── RagTest/      # RAG 测试组件
-│   │   │   ├── Sidebar/      # 侧边栏组件
-│   │   │   ├── ZiweiChart/   # 紫微斗数命盘组件
-│   │   │   └── BirthForm.tsx # 出生信息表单
-│   │   ├── contexts/         # React Context
-│   │   │   └── AuthContext.tsx  # 认证状态管理
-│   │   ├── hooks/            # 自定义 React Hooks
-│   │   │   ├── useAIChat.ts  # AI 聊天逻辑
-│   │   │   └── useZiweiData.ts # 命盘数据管理
-│   │   ├── lib/              # 工具函数和 AI 集成
-│   │   └── types/            # TypeScript 类型定义
-│   ├── package.json          # 前端依赖
-│   └── next.config.js        # Next.js 配置
-├── src/                      # Node.js 后端
-│   └── server.js             # API 服务入口
-├── backend/                  # 后端配置
-│   ├── .env                  # 本地环境变量
-│   └── services/             # 后端服务
-├── .trae/                    # 项目文档和规格文件
-├── package.json              # 后端依赖
-├── README.md                 # 项目说明
-└── .gitignore                # Git 忽略文件
+- DashScope 兼容接口
+- 当前前端内置模型：`qwen3-max`、`glm-4.7`、`qwen3.5-flash`、`kimi-k2.5`
+
+## 目录结构（核心）
+
+```text
+FatePilot/
+├─ frontend/                  # Next.js 前端
+│  ├─ src/app/                # 页面入口
+│  ├─ src/components/         # UI 组件（AIChat / AIFortuneTeller / ZiweiChart 等）
+│  ├─ src/hooks/              # 业务 hooks（useZiweiData / useAIChat）
+│  ├─ src/lib/                # Prompt、模型调用、工具函数
+│  └─ src/types/              # 类型定义
+├─ src/server.js              # Node.js API 服务入口
+├─ backend/services/          # RAG 检索服务
+├─ backend/data/              # 文档与向量数据
+├─ DEVLOG.md                  # 详细开发日志（细节）
+└─ README.md                  # 项目说明（本文件）
 ```
 
-## 🚀 快速开始
+## 快速开始
 
-### 前置要求
+### 1) 前置要求
 
-- Node.js 16+
-- npm 或 yarn
-- 阿里云百炼 API Key（用于 AI 功能）
+- Node.js 18+
+- npm 9+
 
-### 本地运行
-
-#### 1. 克隆项目
+### 2) 克隆项目
 
 ```bash
-git clone git@github.com:Gabriel2git/ziwei-app.git
-cd ziwei-app
+git clone https://github.com/Gabriel2git/FatePilot.git
+cd FatePilot
 ```
 
-#### 2. 安装依赖
+### 3) 安装依赖
 
 ```bash
-# 安装后端依赖
+# 根目录（后端依赖）
 npm install
 
-# 安装前端依赖
+# 前端依赖
 cd frontend
 npm install
+cd ..
 ```
 
-#### 3. 配置环境变量
+### 4) 配置环境变量
 
-**后端环境变量** (`backend/.env`):
+后端：`backend/.env`
+
 ```env
-# 鉴权配置
-AUTH_CODE=your_auth_code_here
+# 必填：AI 功能邀请码
+AUTH_CODE=your_auth_code
 ```
 
-**前端环境变量** (`frontend/.env.local`):
+前端：`frontend/.env.local`
+
 ```env
+# 可选：后端地址，不填默认 http://localhost:3001
 NEXT_PUBLIC_API_URL=http://localhost:3001
-DASHSCOPE_API_KEY=your_aliyun_dashscope_api_key
+
+# 必填：DashScope Key（前端读取键名）
+NEXT_PUBLIC_DASHSCOPE_API_KEY=your_dashscope_api_key
 ```
 
-#### 4. 启动服务
+### 5) 启动服务
+
+终端 A（项目根目录）：
 
 ```bash
-# 启动后端 API 服务（在项目根目录）
 node src/server.js
+```
 
-# 启动前端开发服务器（在 frontend 目录）
+终端 B（`frontend` 目录）：
+
+```bash
 npm run dev
 ```
 
-前端应用将在 http://localhost:3000 打开
-后端 API 服务将在 http://localhost:3001 运行
+访问：
 
-## 📱 使用说明
+- 前端：http://localhost:3000
+- 后端：http://localhost:3001
 
-### 1. 输入出生信息
-- 选择历法（公历/农历）
-- 输入出生日期和时间
-- 选择性别
-- 选择出生地（用于真太阳时计算）
+## API 概览（以 `src/server.js` 为准）
 
-### 2. 开始排盘
-点击「开始排盘」按钮生成命盘
+| Method | Path | 说明 |
+| --- | --- | --- |
+| GET | `/health` | 健康检查 |
+| POST | `/api/ziwei-lite` | 轻量命盘数据（用于快速渲染） |
+| POST | `/api/ziwei-context` | 命盘上下文数据（selectedContext / decadalYearlyInfo 等） |
+| POST | `/api/ziwei` | 完整命盘聚合数据 |
+| POST | `/api/rag/search` | RAG 检索 |
+| POST | `/api/rag/test` | RAG 测试（返回示例 prompt） |
+| POST | `/api/verify-code` | 邀请码校验 |
 
-### 3. 查看命盘
-- 十二宫布局显示
-- 包含主星、辅星、小星信息
-- 显示大限和流年信息
-- 真太阳时校验结果
+## 使用流程
 
-### 4. AI 命理咨询
-- **邀请码验证**：首次使用 AI 命理师功能需要输入邀请码
-- **选择命理师人格**：
-  - 🤗 大白话解盘伴侣 - 用通俗易懂的语言解释命盘
-  - 🎓 硬核紫微导师 - 专业深入的命理分析
-  - 🌿 人生导航与疗愈师 - 结合心理学的温暖建议
-- **调试功能**：点击调试按钮可查看完整的 system prompt
+1. 输入出生信息并排盘。
+2. 在命盘页切换大限/流年按钮，观察命盘联动变化。
+3. 进入 AI 页面，选择 persona 和模型后提问。
+4. 如需排查，打开调试区查看完整系统提示词（Prompt）。
 
-### 5. RAG 测试
-- 单独的 RAG 功能测试界面
-- 输入查询，查看检索结果
+## 项目迭代里程碑
 
-## 🔐 邀请码验证功能
+### 2026-02-21：基础能力稳定期
 
-### 功能说明
-AI 命理师功能消耗 AI 大模型 Token，需要邀请码（功德码）才能使用。
+为什么改：早期虚岁/流年口径存在边界误差，影响运限推演可信度。  
+改了什么：修复虚岁计算、流年显示、Prompt 注入基础字段。  
+带来的影响：命盘与 AI 分析基线稳定，结果可解释性提升。
 
-### 验证流程
-1. 用户点击「AI 命理师」页面
-2. 系统检查是否已验证邀请码
-3. 未验证用户显示邀请码输入界面
-4. 输入正确的邀请码后，可永久使用 AI 功能
+### 2026-02-23：命盘渲染重构期
 
-### 配置邀请码
+为什么改：第三方渲染依赖灵活性不足。  
+改了什么：移除 `react-iztro` 强耦合，落地自研 `ZiweiChart`，实现动态四化视觉渲染。  
+带来的影响：可维护性、可定制性与前端性能明显提升。
 
-**本地开发**：
-在 `backend/.env` 文件中设置：
-```env
-AUTH_CODE=your_invitation_code
-```
+### 2026-02-25：工程化重构期
 
-**生产环境（Render）**：
-1. 登录 Render Dashboard
-2. 找到后端服务
-3. 点击 **Environment** 标签
-4. 添加环境变量：
-   - **Key**: `AUTH_CODE`
-   - **Value**: 你的邀请码
-5. 点击 **Save Changes**
+为什么改：功能增长后单页与逻辑耦合偏高。  
+改了什么：页面与组件拆分、hooks 抽象、职责边界清晰化。  
+带来的影响：开发效率提升，后续迭代风险下降。
 
-## 🌐 云端部署
+### 2026-03-05 ~ 2026-03-11：AI 与部署增强期
 
-### 架构说明
-- **前端**：部署在 Vercel
-- **后端**：部署在 Render
-- **跨域**：后端已配置 CORS 允许前端域名访问
+为什么改：需要提升分析质量与线上可用性。  
+改了什么：RAG 增强、模型扩展、邀请码鉴权、云端部署兼容性修复。  
+带来的影响：回答质量与稳定性增强，生产环境更可控。
 
-### 前端部署（Vercel）
+### 2026-03-24 ~ 2026-03-25：Prompt 结构化优化期
 
-#### 1. 准备环境变量
-在 Vercel Dashboard 中设置：
-```env
-NEXT_PUBLIC_API_URL=https://your-render-app.onrender.com
-DASHSCOPE_API_KEY=your_aliyun_dashscope_api_key
-```
+为什么改：Prompt 信息冗余，模型抓取“本命 vs 运限引动”成本高。  
+改了什么：
 
-#### 2. 部署步骤
-1. 登录 Vercel Dashboard
-2. 导入 GitHub 仓库
-3. 设置根目录为 `frontend`
-4. 配置环境变量
-5. 点击 Deploy
+- 大限/流年宫位分离展示（结构化字段）
+- 星曜级动态四化标签（主星 + 辅星）
+- 精简重复字段，降低无效 token
 
-#### 3. 自定义域名（可选）
-- 在 Vercel 项目设置中添加自定义域名
-- 配置 DNS 解析
+带来的影响：模型更容易定位“谁在变化、变化来自哪里”，解读一致性提升。
 
-### 后端部署（Render）
+## 常见问题
 
-#### 1. 准备环境变量
-在 Render Dashboard 中设置：
-```env
-AUTH_CODE=your_invitation_code
-```
+### 1) 邀请码验证失败
 
-#### 2. 部署步骤
-1. 登录 Render Dashboard
-2. 创建新的 Web Service
-3. 导入 GitHub 仓库
-4. 设置启动命令：`node src/server.js`
-5. 配置环境变量
-6. 点击 Create Web Service
+- 检查 `backend/.env` 是否配置 `AUTH_CODE`
+- 确认后端进程已重启并加载新环境变量
 
-#### 3. 注意事项
-- Render 免费版会在一段时间不活动后休眠
-- 首次访问可能需要等待服务唤醒（约 30 秒）
+### 2) 前端提示网络错误
 
-### 生产环境地址
+- 检查 `NEXT_PUBLIC_API_URL` 是否指向可访问后端
+- 确认后端 `http://localhost:3001/health` 可返回 `ok`
 
-- **前端**：https://ziwei-app-gz.vercel.app/
-- **后端**：https://ziwei-api-zdy7.onrender.com
+### 3) AI 提示 Key 未设置
 
-## 🎛️ 核心功能说明
+- 检查 `frontend/.env.local` 是否配置 `NEXT_PUBLIC_DASHSCOPE_API_KEY`
+- 重启前端开发服务器
 
-### 紫微斗数计算
-- 使用 iztro 库进行专业的紫微斗数计算
-- 支持阳历和阴历出生日期
-- 基于经度的真太阳时计算
-- 完整的十二宫信息，包括主星、辅星、小星
+### 4) 命盘切换后 Prompt 看起来没更新
 
-### AI 命理分析
-- 基于命盘信息生成详细的 AI 提示词
-- 包含四化计算和大运流年信息
-- 支持多种命理师人格（Persona）
-- 集成 glm-4.7、qwen3.5-flash、kimi-k2.5 等模型
+- 先确认查看的是最新提交对应文件（不是仅看最顶层提交）
+- 在 AI 调试区查看完整 Prompt 内容
 
-### RAG 检索增强
-- 基于阿里云百炼的向量嵌入服务
-- 支持文本和 PDF 文档的向量化
-- 智能检索相关命理知识
-- 提高 AI 分析的准确性和相关性
+## 部署说明（简版）
 
-### 命理师人格（Persona）
+- 前端推荐部署到 Vercel，根目录设为 `frontend`
+- 后端推荐部署到 Render，启动命令：`node src/server.js`
+- 生产环境务必配置：`AUTH_CODE`、`NEXT_PUBLIC_API_URL`、`NEXT_PUBLIC_DASHSCOPE_API_KEY`
 
-#### 1. 大白话解盘伴侣（The Plain-Language Companion）
-- **风格**：通俗易懂，接地气
-- **特点**：用大白话解释复杂的命理概念
-- **适用**：初学者，想要轻松了解命盘的用户
+## 免责声明
 
-#### 2. 硬核紫微导师（The Hardcore Ziwei Mentor）
-- **风格**：专业严谨，学术派
-- **特点**：深入分析星曜组合、四化飞星
-- **适用**：有一定基础，想要深入学习的研究者
+本项目用于学习、研究与体验，不构成现实决策建议。请理性看待命理分析结果。
 
-#### 3. 人生导航与疗愈师（The Life Navigator & Healer）
-- **风格**：温暖包容，心理学视角
-- **特点**：将命盘与心理成长结合，提供建设性建议
-- **适用**：寻求人生指引和心灵慰藉的用户
+## 致谢
 
-### 界面设计
-- 参考文墨天机的设计风格
-- 响应式布局，适配各种设备
-- 清晰的命盘信息展示
-- 支持深色模式
-
-## 🔧 常见问题排查
-
-### 1. 邀请码验证失败
-**现象**：输入邀请码后显示"邀请码错误"
-**排查**：
-- 检查 Render 环境变量 `AUTH_CODE` 是否设置
-- 确认后端代码已更新（支持生产环境变量）
-- 查看 Render 日志确认环境变量加载情况
-
-### 2. 网络错误
-**现象**：显示"网络错误，请稍后重试"
-**排查**：
-- 检查 Vercel 环境变量 `NEXT_PUBLIC_API_URL` 是否正确
-- 确认 Render 后端服务正在运行
-- 检查浏览器开发者工具的网络请求
-
-### 3. Persona 切换后 prompt 不更新
-**现象**：切换命理师后调试窗口显示旧的 prompt
-**原因**：已修复，确保使用最新代码
-
-## 📝 更新日志
-
-### v3.6.0 (2026-03-11)
-- ✅ 修复 Vercel + Render 跨域问题
-- ✅ 添加邀请码验证功能
-- ✅ 修复 Persona 切换后 debugPrompt 不同步问题
-- ✅ 优化 AI 模型排序（glm-4.7 默认首位）
-- ✅ 添加未排盘检查，防止未排盘选择 Persona
-
-### v3.5.0 (2026-03-05)
-- ✅ 集成 RAG 检索增强功能
-- ✅ 添加 qwen3.5-flash 模型支持
-- ✅ 优化前端性能和用户体验
-- ✅ 修复 TypeScript 编译错误
-
-### v3.0.0 (2026-02-18)
-- ✅ 前端迁移：从 Streamlit 改为 React + Next.js
-- ✅ 功能增强：添加真太阳时校验、完整的星曜信息
-- ✅ AI 提示词优化：包含详细的命盘信息和四化计算
-- ✅ 代码重构：采用现代化的前端架构
-
-### v2.0.0
-- 代码重构：采用关注点分离原则
-- 模块拆分：config, calculations, api_client, prompts, ui_components
-
-### v1.0.0
-- 初始版本发布
-- 完整的紫微斗数排盘功能
-- AI 命理师集成
-- 响应式设计
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可证
-
-ISC License
-
-## 🙏 致谢
-
-- [iztro](https://github.com/sylarlong/iztro) - 紫微斗数计算库
-- [React](https://react.dev/) - 前端 UI 库
-- [Next.js](https://nextjs.org/) - React 框架
-- [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
-- [Vercel](https://vercel.com/) - 前端部署平台
-- [Render](https://render.com/) - 后端部署平台
-- [阿里云百炼](https://bailian.aliyun.com/) - AI 模型和向量嵌入服务
-
----
-
-**注意**：本应用仅供娱乐和研究使用，命理分析结果不构成任何决策建议。
+- [iztro](https://github.com/sylarlong/iztro)
+- [Next.js](https://nextjs.org/)
+- [React](https://react.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Vercel](https://vercel.com/)
+- [Render](https://render.com/)
