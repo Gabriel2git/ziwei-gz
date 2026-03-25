@@ -75,28 +75,36 @@ function formatMutagen(mutagen: string[] | undefined): string {
     .join(',') || '无';
 }
 
-function formatStars(stars: any[] | undefined, withMutagen = false): string {
+function getMutagenTagByStarName(
+  starName: string | undefined,
+  mutagen: string[] | undefined,
+  prefix: '' | '大限' | '流年',
+): string {
+  if (!starName || !Array.isArray(mutagen) || mutagen.length === 0) return '';
+  const index = mutagen.findIndex((name) => name === starName);
+  if (index < 0 || index > 3) return '';
+  return `[${prefix}${MUTAGEN_LABELS[index]}]`;
+}
+
+function formatStars(
+  stars: any[] | undefined,
+  options?: {
+    showBirthMutagen?: boolean;
+    decadalMutagen?: string[];
+    yearlyMutagen?: string[];
+  },
+): string {
   if (!Array.isArray(stars) || stars.length === 0) return '无';
   return stars
     .map((star) => {
       const brightness = star?.brightness ? `[${star.brightness}]` : '';
-      const mutagen = withMutagen && star?.mutagen ? `[${star.mutagen}]` : '';
-      return `${star?.name || ''}${brightness}${mutagen}`;
+      const birthMutagen = options?.showBirthMutagen && star?.mutagen ? `[${star.mutagen}]` : '';
+      const decadalMutagen = getMutagenTagByStarName(star?.name, options?.decadalMutagen, '大限');
+      const yearlyMutagen = getMutagenTagByStarName(star?.name, options?.yearlyMutagen, '流年');
+      return `${star?.name || ''}${brightness}${birthMutagen}${decadalMutagen}${yearlyMutagen}`;
     })
     .filter(Boolean)
     .join(',') || '无';
-}
-
-function formatCurrentYearField(palace: Palace, selectedContext: SelectedContext | undefined): string {
-  if (!selectedContext?.yearly?.earthlyBranch) return '无';
-  if (selectedContext.yearly.earthlyBranch !== palace.earthlyBranch) return '无';
-
-  const age = selectedContext.nominalAge;
-  const year = selectedContext.targetYear;
-  if (typeof age === 'number') {
-    return `${age}虚岁(${year}年)`;
-  }
-  return `${year}年`;
 }
 
 function getDynamicPalaceName(currentBranch: string | undefined, targetLifeBranch: string | undefined): string | null {
@@ -137,32 +145,16 @@ function buildPalaceText(astrolabe: any, horoscope: any, selectedContext?: Selec
     .map((palace, palaceIndex) => {
       const decadalRoleName = resolvePalaceRoleName(palaceIndex, 'decadal', horoscope, palace, selectedContext);
       const yearlyRoleName = resolvePalaceRoleName(palaceIndex, 'yearly', horoscope, palace, selectedContext);
-      const relation =
-        decadalRoleName !== '无' && yearlyRoleName !== '无' ? (decadalRoleName === yearlyRoleName ? '同宫' : '分宫') : '无';
-      const decadalBranch = selectedContext?.decadal?.earthlyBranch || horoscope?.decadal?.earthlyBranch;
-      const yearlyBranch = selectedContext?.yearly?.earthlyBranch || horoscope?.yearly?.earthlyBranch;
-      const isCurrentDecadalPalace = Boolean(decadalBranch) && decadalBranch === palace?.earthlyBranch;
-      const isCurrentYearlyPalace = Boolean(yearlyBranch) && yearlyBranch === palace?.earthlyBranch;
-      const lineItems = [`限流关系 : ${relation}`];
-
-      if (isCurrentDecadalPalace) {
-        lineItems.push(`当前大限四化 : ${formatMutagen(selectedContext?.decadal?.mutagen || horoscope?.decadal?.mutagen)}`);
-      }
-      if (isCurrentYearlyPalace) {
-        lineItems.push(`当前流年四化 : ${formatMutagen(selectedContext?.yearly?.mutagen || horoscope?.yearly?.mutagen)}`);
-      }
-
-      const relationAndMutagenLines = lineItems
-        .map((line, index) => `│   ${index === lineItems.length - 1 ? '└' : '├'}${line}`)
-        .join('\n');
+      const decadalMutagen = selectedContext?.decadal?.mutagen || horoscope?.decadal?.mutagen;
+      const yearlyMutagen = selectedContext?.yearly?.mutagen || horoscope?.yearly?.mutagen;
 
       const start = palace?.decadal?.range?.[0] ?? '-';
       const end = palace?.decadal?.range?.[1] ?? '-';
       const minorAges = Array.isArray(palace?.ages) && palace.ages.length ? palace.ages.join(',') : '无';
 
       return `│ └${palace?.name || '未知宫'}[${palace?.heavenlyStem || ''}${palace?.earthlyBranch || ''}]
-│   ├主星 : ${formatStars(palace?.majorStars, true)}
-│   ├辅星 : ${formatStars(palace?.minorStars)}
+│   ├主星 : ${formatStars(palace?.majorStars, { showBirthMutagen: true, decadalMutagen, yearlyMutagen })}
+│   ├辅星 : ${formatStars(palace?.minorStars, { showBirthMutagen: true, decadalMutagen, yearlyMutagen })}
 │   ├小星 : ${formatStars(palace?.adjectiveStars)}
 │   ├神煞
 │   │ ├岁前星 : ${palace?.suiqian12 || '无'}
@@ -171,10 +163,8 @@ function buildPalaceText(astrolabe: any, horoscope: any, selectedContext?: Selec
 │   │ └太岁煞禄 : ${palace?.boshi12 || '无'}
 │   ├大限 : ${start} ~ ${end}虚岁
 │   ├小限 : ${minorAges}虚岁
-│   ├流年 : ${formatCurrentYearField(palace, selectedContext)}
 │   ├大限宫位 : ${decadalRoleName}
-│   ├流年宫位 : ${yearlyRoleName}
-${relationAndMutagenLines}`;
+│   └流年宫位 : ${yearlyRoleName}`;
     })
     .join('\n\n');
 }
